@@ -11,9 +11,12 @@ namespace :ctl do
   
     CMD = "#{@java_cmd} -jar #{app_file} #{@app_opts}"
     @logger.info "Starting server with #{CMD}"
-  
-    pid = fork { exec( CMD ) }
-    Process.detach(pid)
+
+    process = ChildProcess.build(*CMD.split(" "))
+    process.detach = true
+    process.io.inherit!
+    process.start
+    pid = process.pid
     File.open(".nakamura.pid", 'w') {|f| f.write(pid) }
   end
 
