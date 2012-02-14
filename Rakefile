@@ -72,7 +72,7 @@ Mustache.template_path = "./templates"
 
 # setup java command and options
 java_exec = "java"
-java_opts = "-Xms256m -Xmx1024m -XX:PermSize=64m -XX:MaxPermSize=512m"
+java_opts = "-Dfile.encoding=UTF8 -Xms256m -Xmx1024m -XX:PermSize=64m -XX:MaxPermSize=512m"
 java_debug_opts = "-Xdebug -Xrunjdwp:transport=dt_socket,address=8500,server=y,suspend=n"
 java_debug = false
 
