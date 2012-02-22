@@ -166,6 +166,9 @@ task :run => 'ctl:run'
 desc 'Shortcut to ctl:kill'
 task :kill => 'ctl:kill'
 
+desc 'Shortcut to ctl:stat'
+task :stat => 'ctl:stat'
+
 desc 'Shortcut to bld:update'
 task :update => 'bld:update'
 
