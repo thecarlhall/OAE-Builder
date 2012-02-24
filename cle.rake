@@ -40,8 +40,12 @@ namespace :cle do
   desc "Start a CLE server. Will kill the previously started server if still running."
   task :run => 'cle:kill' do
     ENV['CATALINA_PID'] = ".sakai-@cle.pid"
-    pid = fork { exec( "./sakai2-demo/bin/startup.sh" ) }
-    Process.detach(pid)
+
+    process = ChildProcess.build("./sakai2-demo/bin/startup.sh")
+    process.detach = true
+    process.io.inherit!
+    process.start
+    pid = process.pid
   end
 
   desc "Kill the CLE server."
