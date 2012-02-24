@@ -13,3 +13,4 @@ tmp/
 ui-conf/
 bin/
 .rvmrc
+.DS_Store
