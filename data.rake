@@ -1,65 +1,52 @@
+require 'nakamura/full_group_creator'
+require 'nakamura/contacts'
+require 'nakamura/message'
+include SlingUsers
+include SlingContacts
+include SlingMessage
+
+@um = FullGroupCreator.new(@sling)
+@cm = ContactManager.new(@sling)
+@mm = MessageManager.new(@sling)
+
+#@sling.log.level = Logger::DEBUG
+
 namespace :data do
   desc "Create initial content (users, connections, messages)"
   task :setup => ['data:users:create', 'data:connections:make', 'data:messages:send', 'data:groups:create']
 
   namespace :connections do
+
+    def connect(u1, u2)
+      user1 = User.new("user#{u1}", "test")
+      user2 = User.new("user#{u2}", "test")
+      @logger.info "Requesting connection between User #{u1} and User #{u2}"
+      @sling.switch_user(user1)
+      @logger.info @cm.invite_contact(user2.name, "Classmate")
+
+      @logger.info "Accepting connection between User #{u1} and User #{u2}"
+      @sling.switch_user(user2)
+      @cm.accept_contact(user1.name)
+      @sling.switch_user(User.admin_user)
+    end
+
     desc "Make connections between each user and the next sequential user id"
-    task :make => [:setuprequests] do
+    task :make do
       @num_users_groups.times do |i|
         i = i+1
-        nextuser = i % @num_users_groups + 1
-  
-        @logger.info "Requesting connection between User #{i} and User #{nextuser}"
-        req = Net::HTTP::Post.new("/~user#{i}/contacts.invite.html")
-        req.set_form_data({
-          "fromRelationships" => "Classmate",
-          "toRelationships" => "Classmate",
-          "targetUserId" => "user#{nextuser}",
-          "_charset_" => "utf-8"
-        })
-        req.basic_auth("user#{i}", "test")
-        response = @localinstance.request(req)
-        @logger.info response
-  
-        @logger.info "Accepting connection between User #{i} and User #{nextuser}"
-        req = Net::HTTP::Post.new("/~user#{nextuser}/contacts.accept.html")
-        req.set_form_data({
-          "targetUserId" => "user#{i}",
-          "_charset_" => "utf-8"
-        })
-        req.basic_auth("user#{nextuser}", "test")
-        response = @localinstance.request(req)
+        n = i % @num_users_groups + 1
+        connect(i, n) 
       end
     end
 
     desc "Create tons of connections for each user"
-    task :maketons => [:setuprequests] do
+    task :maketons do
       @num_users_groups.times do |i|
         i = i+1
         (@num_users_groups-1).times do |j|
           j=j+1
           unless i == j
-            nextuser = j
-            @logger.info "Requesting connection between User #{i} and User #{nextuser}"
-            req = Net::HTTP::Post.new("/~user#{i}/contacts.invite.html")
-            req.set_form_data({
-              "fromRelationships" => "Classmate",
-              "toRelationships" => "Classmate",
-              "targetUserId" => "user#{nextuser}",
-              "_charset_" => "utf-8"
-            })
-            req.basic_auth("user#{i}", "test")
-            response = @localinstance.request(req)
-            @logger.info response
-    
-            @logger.info "Accepting connection between User #{i} and User #{nextuser}"
-            req = Net::HTTP::Post.new("/~user#{nextuser}/contacts.accept.html")
-            req.set_form_data({
-              "targetUserId" => "user#{i}",
-              "_charset_" => "utf-8"
-            })
-            req.basic_auth("user#{nextuser}", "test")
-            response = @localinstance.request(req)
+            connect(i, j)
           end
         end
       end
@@ -71,82 +58,69 @@ namespace :data do
   # ===========================================
   namespace :groups do
     desc "Add a lot of users as members to a group"
-    task :addallusers => [:setuprequests] do
+    task :addallusers do
       if (!(ENV["group"])) then
-        @logger.info "Usage: rake adduserstogroup group=groupid-role num=numusers"
+        @logger.info "Usage: rake data:groups:addallusers group=groupid-role"
       else
-        group = ENV["group"]
+        group = Group.new(ENV["group"])
         @num_users_groups.times do |i|
           i = i+1
-          @logger.info "joining user#{i} to #{group}"
-          req = Net::HTTP::Post.new("/system/userManager/group/#{group}.update.json")
-          req.set_form_data({
-            ":member" => "user#{i}",
-            ":viewer" => "user#{i}",
-            "_charset_" => "utf-8"
-          })
-          req.basic_auth("admin", "admin")
-          response = @localinstance.request(req)
-          @logger.info response
+          @logger.info "joining user#{i} to #{group.name}"
+          @logger.info group.add_member(@sling, "user#{i}", "user") 
         end
       end
     end
     
     desc "Create #{@num_users_groups} groups; Each is created by the user with the matching id"
-    task :create => [:setuprequests] do
+    task :create do
       @num_users_groups.times do |i|
         i = i+1
         @logger.info "Creating Group #{i}"
-        req = Net::HTTP::Post.new("/system/world/create")
-        json = {
-          "id" => "group#{i}",
-          "title" => "Group #{i}",
-          "description" => "Group #{i} description",
-          "joinability" => "yes",
-          "visibility" => "public",
-          "tags" => [],
-          "worldTemplate" => "/var/templates/worlds/group/simple-group",
-          "_charset_" => "utf-8",
-          "usersToAdd" => [{
-            "userid" => "user#{i}",
-            "name" => "User #{i}",
-            "firstname" => "User",
-            "role" => "manager",
-            "roleString" => "Manager",
-            "creator" => "true"
-          }]
-        }
-        req.set_form_data({ "data" => JSON.generate(json) })
-        req.basic_auth("admin", "admin")
-        response = @localinstance.request(req)
-        @logger.info response
+        user = User.new("user#{i}", "test")
+        @logger.info @um.create_full_group(user, "group#{i}", "Group #{i}", "Group #{i} description")
       end
     end
   end
 
   namespace :messages do
+
+    def sendmessage(u1, u2, subject="Test message", body="Test message body", internalOnly=false)
+      user1 = User.new("#{u1}", "test")
+      @logger.info "Sending internal message: #{u1} => #{u2}"
+      @sling.switch_user(user1)
+      content = {
+        "sakai:subject" => subject,
+        "sakai:body" => body
+      }
+      res = @mm.create("#{u2}", "internal", "outbox", content) 
+      message = JSON.parse(res.body)
+      @mm.send(message["id"], "#{u1}")
+
+      unless internalOnly
+        @logger.info "Sending smtp message: #{u1} => #{u2}"
+        res = @mm.create("#{u2}", "smtp", "pending", content) 
+        message = JSON.parse(res.body)
+        @mm.send(message["id"], "#{u1}")
+      end
+
+      @sling.switch_user(User.admin_user)
+    end
+
     desc "Send messages between users"
-    task :send => [:setuprequests] do
+    task :send do
       @num_users_groups.times do |i|
         i += 1
         nextuser = i % @num_users_groups + 1
-  
-        @logger.info "Sending internal message: user#{i} => user#{nextuser}"
-        @logger.info send_internal_message("user#{i}", "user#{nextuser}", "test #{i} => #{nextuser}", "test body #{i} => #{nextuser}")
-  
-        @logger.info "Sending smtp message: user#{i} => user#{nextuser}"
-        @logger.info send_smtp_message("user#{i}", "user#{nextuser}", "test #{i} => #{nextuser}", "test body #{i} => #{nextuser}")
-  
-        @logger.info "Sending internal message: user#{nextuser} => user#{i}"
-        @logger.info send_internal_message("user#{nextuser}", "user#{i}", "test #{nextuser} => #{i}", "test body #{nextuser} => #{i}")
-  
-        @logger.info "Sending smtp message: user#{nextuser} => user#{i}"
-        @logger.info send_smtp_message("user#{nextuser}", "user#{i}", "test #{nextuser} => #{i}", "test body #{nextuser} => #{i}")
+ 
+        sendmessage("user#{i}", "user#{nextuser}", "test #{i} => #{nextuser}", "test body #{i} => #{nextuser}") 
+          
+        sendmessage("user#{nextuser}", "user#{i}", "test #{nextuser} => #{i}", "test body #{nextuser} => #{i}")
+
       end
     end
   
     desc "Send lots of messages to the specified user, from the specified user"
-    task :sendlots => [:setuprequests] do
+    task :sendlots do
       if (!(ENV["to"] && ENV["from"] && ENV["num"])) then
         @logger.info "Usage: rake sendlotsofmessages to=user1 from=user2 num=60"
       else
@@ -155,7 +129,7 @@ namespace :data do
         num = ENV["num"].to_i
         @logger.info "Sending #{num} messages from #{from} to #{to}"
         num.times do |i|
-          @logger.info send_internal_message("#{to}", "#{from}", "Message #{i} #{from} => #{to}", "Body of Message #{i} #{from} => #{to}")
+          sendmessage("#{to}", "#{from}", "Message #{i} #{from} => #{to}", "Body of Message #{i} #{from} => #{to}", true)
         end
       end
     end
@@ -163,26 +137,15 @@ namespace :data do
 
   namespace :users do
     desc "Create #{@num_users_groups} users"
-    task :create => [:setuprequests] do
+    task :create do
       @num_users_groups.times do |i|
         i = i+1
         @logger.info "Creating User #{i}"
-        req = Net::HTTP::Post.new("/system/userManager/user.create.html")
-        req.set_form_data({
-          ":name" => "user#{i}",
-          "pwd" => "test",
-          "pwdConfirm" => "test",
-          "email" => "user#{i}@sakaiproject.invalid",
-          "firstName" => "User",
-          "lastName" => "#{i}",
-          "locale" => "en_US",
-          "timezone" => "America/Los_Angeles",
-          "_charset_" => "utf-8",
-          ":sakai:profile-import" => "{'basic': {'access': 'everybody', 'elements': {'email': {'value': 'user#{i}@sakaiproject.invalid'}, 'firstName': {'value': 'User'}, 'lastName': {'value': '#{i}'}}}}"
-        })
-        req.basic_auth("admin", "admin")
-        response = @localinstance.request(req)
-        @logger.info response
+        user = User.new("user#{i}")
+        user.firstName = "User"
+        user.lastName = "#{i}"
+        user.password = "test"
+        @logger.info @um.create_user_object(user)
       end
     end
   end
