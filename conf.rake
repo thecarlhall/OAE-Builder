@@ -1,3 +1,8 @@
+require "nakamura/osgiconf"
+include OSGIConf
+
+@oconf = Conf.new(@sling)
+
 namespace :conf do
   desc "Configure nakamura"
   task :config do
@@ -38,24 +43,17 @@ namespace :conf do
     # = Set FSResource =
     # ==================
     def setFsResource(slingpath, fspath)
-      # set fsresource paths
-      # has to be a single URL POST, no post params (weird, I know)
-      url = "/system/console/configMgr/[Temporary%20PID%20replaced%20by%20real%20PID%20upon%20save]"
-      url += "?propertylist=provider.roots,provider.file,provider.checkinterval"
-      url += "&provider.roots=#{slingpath}"
-      url += "&provider.file=#{fspath}"
-      url += "&provider.checkinterval=1000"
-      url += "&apply=true"
-      url += "&factoryPid=org.apache.sling.fsprovider.internal.FsResourceProvider"
-      url += "&action=ajaxConfigManager"
-      req = Net::HTTP::Post.new(url)
-      req.basic_auth("admin", "admin")
-      response = @localinstance.request(req)
-      @logger.info response.inspect
+      fsProviderPid = "org.apache.sling.fsprovider.internal.FsResourceProvider"
+      props = {
+        "provider.roots" => slingpath,
+        "provider.file" => fspath,
+        "provider.checkinterval" => 1000
+      }
+      @oconf.setProperties(fsProviderPid, props)
     end
 
     desc "Set the FSResource configs to use the UI files on disk."
-    task :set => [:setuprequests] do
+    task :set do
       uiabspath = File.expand_path(@ui["path"])
       @fsresources.each do |dir|
         setFsResource(dir, "#{uiabspath}#{dir}")
@@ -63,7 +61,7 @@ namespace :conf do
     end
 
     desc "Set fsresource just for the UI config"
-    task :uiconf => [:setuprequests] do
+    task :uiconf do
       unless Dir.exists?("./ui-conf")
         FileUtils.cp_r("#{@ui["path"]}/dev/configuration/", "./ui-conf")
       end

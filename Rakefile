@@ -3,7 +3,6 @@ require 'bundler/setup'
 Bundler.require(:default)
 require 'net/http'
 require 'uri'
-require './messaging'
 require 'fileutils'
 require 'socket'
 require 'rexml/document'
@@ -11,6 +10,7 @@ require 'rexml/xpath'
 require 'zlib'
 require 'archive/tar/minitar'
 require 'logger'
+include SlingInterface
 
 # Our own little logger, because the default one is ugly
 class SakaiLogger < Logger::Formatter
@@ -122,6 +122,7 @@ CLEAN_FILES = ["./derby.log", "./sling", "./activemq-data", "./store", "./sakai2
 @app_file = app_file
 @app_opts = app_opts
 @logger = logger
+@sling = Sling.new("http://localhost:#{@nakamura["port"]}")
 
 ## log some initial values before reading in other task definitions
 @logger.info "Using settings:"
@@ -148,11 +149,6 @@ end
 ########################
 ##  Task Definitions  ##
 ########################
-task :setuprequests do
-  @uri = URI.parse("http://localhost:#{@nakamura["port"]}")
-  @localinstance = Net::HTTP.new(@uri.host, @uri.port)
-end
-
 desc 'Create users, greate groups, make connections, send messages, set FSResource, clean the UI'
 task :setup => ['data:setup', 'conf:fsresource:set', 'bld:clean:ui']
 

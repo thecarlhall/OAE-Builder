@@ -107,10 +107,10 @@ namespace :cle do
 
   namespace :hybrid do
     desc "Enable Hybrid Widgets and Config"
-    task :enable => [:setuprequests] do
-      enableInPortal("devwidgets/mysakai2/config.json", "http://admin:admin@localhost:#{@nakamura["port"]}")
-      enableInSakaiDoc("devwidgets/basiclti/config.json", "http://admin:admin@localhost:#{@nakamura["port"]}")
-      enableInSakaiDoc("devwidgets/sakai2tools/config.json", "http://admin:admin@localhost:#{@nakamura["port"]}")
+    task :enable do
+      enableInPortal("devwidgets/mysakai2/config.json")
+      enableInSakaiDoc("devwidgets/basiclti/config.json")
+      enableInSakaiDoc("devwidgets/sakai2tools/config.json")
       setFsResource("/dev/configuration/config_custom.js", "#{@oaebuilder_dir}/ui-conf/config_custom_@hybrid.js")
     end
 
@@ -147,33 +147,28 @@ namespace :cle do
     end
   end
 
-  def enableInPortal(path, server)
-    resp = RestClient.get("#{server}/#{path}")
-    json = JSON.parse(resp.to_str)
+  def enableInPortal(path)
+    widgetname = File.basename(File.dirname(path))
+    @logger.info("Enabling #{widgetname} Widget in Portal")
+    resp = @sling.execute_get(@sling.url_for(path))
+    json = JSON.parse(resp.body)
     json["personalportal"] = true
-    postJsonAsFile(path, JSON.generate(json), server)
+    postJsonAsFile(path, JSON.generate(json))
   end
 
-  def enableInSakaiDoc(path, server)
-    resp = RestClient.get("#{server}/#{path}")
-    json = JSON.parse(resp.to_str)
+  def enableInSakaiDoc(path)
+    widgetname = File.basename(File.dirname(path))
+    @logger.info("Enabling #{widgetname} Widget in SakaiDoc")
+    resp = @sling.execute_get(@sling.url_for(path))
+    json = JSON.parse(resp.body)
     json["sakaidocs"] = true
-    postJsonAsFile(path, JSON.generate(json), server)
+    postJsonAsFile(path, JSON.generate(json))
   end
 
-  def postJsonAsFile(path, json, server)
+  def postJsonAsFile(path, json)
     filename = File.basename(path)
-    # I'd rather not write out an intermediary file here, but I'm not sure it's
-    # possible to avoid it.
-    unless Dir.exists?("./tmp")
-      Dir.mkdir("./tmp")
-    end
-    File.open("./tmp/#{filename}", "w") do |temp|
-      temp.write(json)
-    end
 
-    RestClient.post("#{server}/#{File.dirname(path)}", filename => File.new("./tmp/#{filename}"), "#{filename}@TypeHint" => "nt:file")
-    File.delete("./tmp/#{filename}")
+    @logger.info @sling.execute_file_post(@sling.url_for(File.dirname(path)), "file", filename, json, "application/json")
   end
 
   namespace :config do
