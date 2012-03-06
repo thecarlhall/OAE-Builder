@@ -43,13 +43,14 @@ namespace :conf do
     # = Set FSResource =
     # ==================
     def setFsResource(slingpath, fspath)
+      @logger.info "Setting fsresource #{slingpath} -> #{fspath}"
       fsProviderPid = "org.apache.sling.fsprovider.internal.FsResourceProvider"
       props = {
         "provider.roots" => slingpath,
         "provider.file" => fspath,
         "provider.checkinterval" => 1000
       }
-      @oconf.setProperties(fsProviderPid, props)
+      @logger.info @oconf.setProperties(fsProviderPid, props)
     end
 
     desc "Set the FSResource configs to use the UI files on disk."
