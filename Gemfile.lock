@@ -9,7 +9,7 @@ GEM
     minitar (0.5.3)
     mustache (0.99.4)
     mysql (2.8.1)
-    nakamura (0.7)
+    nakamura (0.8)
       json (>= 1.6.3)
     rake (0.9.2.2)
 
@@ -23,5 +23,5 @@ DEPENDENCIES
   minitar
   mustache
   mysql
-  nakamura (= 0.7)
+  nakamura (= 0.8)
   rake
