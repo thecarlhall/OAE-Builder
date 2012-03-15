@@ -51,14 +51,12 @@ namespace :ctl do
   task :status do
     if File.exists? '.nakamura.pid'
       File.open('.nakamura.pid', 'r') do |f|
-        while (line = f.gets) do
-          pid = line.to_i
-          begin
-            Process.kill 0, pid
-            @logger.info "pid [#{pid}] is still running."
-          rescue
-            @logger.info "pid [#{pid}] is no longer valid."
-          end
+        pid = YAML::load(f.read).pid
+        begin
+          Process.kill 0, pid
+          @logger.info "pid [#{pid}] is still running."
+        rescue
+          @logger.info "pid [#{pid}] is no longer valid."
         end
       end
     else
@@ -70,8 +68,8 @@ namespace :ctl do
 
   def kill(pidfile, signal="TERM")
     if File.exists?(pidfile)
-      File.open(pidfile, "r") do
-        pid = YAML::load(file).pid
+      File.open(pidfile, "r") do |f|
+        pid = YAML::load(f.read).pid
         begin
           Process.kill(signal, pid)
           @logger.info "Killing pid #{pid}"
