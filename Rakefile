@@ -159,8 +159,8 @@ task :default => ['bld:clean', 'bld:build', 'ctl:run']
 desc 'Shortcut to ctl:run'
 task :run => 'ctl:run'
 
-desc 'Shortcut to ctl:kill'
-task :kill => 'ctl:kill'
+desc 'Shortcut to ctl:stop'
+task :kill => 'ctl:stop'
 
 desc 'Shortcut to ctl:stat'
 task :stat => 'ctl:stat'
