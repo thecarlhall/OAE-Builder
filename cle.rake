@@ -45,12 +45,11 @@ namespace :cle do
     process.detach = true
     process.io.inherit!
     process.start
-    pid = process.pid
   end
 
   desc "Kill the CLE server."
   task :kill do
-    kill(".sakai-@cle.pid", 9)
+    kill(".sakai-@cle.pid")
   end
 
   desc "Configure the CLE server"

@@ -9,7 +9,7 @@ namespace :ctl do
     process.detach = true
     process.io.inherit!
     process.start
-    pid = YAML::dump(process)
+    pid = process.pid
     File.open(".nakamura.pid", 'w') {|f| f.write(pid) }
   end
 
@@ -51,7 +51,7 @@ namespace :ctl do
   task :status do
     if File.exists? '.nakamura.pid'
       File.open('.nakamura.pid', 'r') do |f|
-        pid = YAML::load(f.read).pid
+        pid = f.read.to_i
         begin
           Process.kill 0, pid
           @logger.info "pid [#{pid}] is still running."
@@ -69,7 +69,7 @@ namespace :ctl do
   def kill(pidfile, signal="TERM")
     if File.exists?(pidfile)
       File.open(pidfile, "r") do |f|
-        pid = YAML::load(f.read).pid
+        pid = f.read.to_i
         begin
           Process.kill(signal, pid)
           @logger.info "Killing pid #{pid}"
