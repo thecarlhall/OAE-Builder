@@ -51,7 +51,7 @@ namespace :ctl do
   task :status do
     if File.exists? '.nakamura.pid'
       File.open('.nakamura.pid', 'r') do |f|
-        pid = f.read
+        pid = f.read.to_i
         begin
           Process.kill 0, pid
           @logger.info "pid [#{pid}] is still running."
