@@ -13,8 +13,8 @@ include SlingMessage
 
 namespace :data do
   def get_count_offset
-    count = (ENV['count'] || @num_users_groups).to_i
-    offset = (ENV['offset'] || 0).to_i
+    count = (ENV['OAEBLDR_COUNT'] || @num_users_groups).to_i
+    offset = (ENV['OAEBLDR_OFFSET'] || 0).to_i
     return count, offset
   end
 
