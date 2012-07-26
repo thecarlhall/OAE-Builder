@@ -12,6 +12,12 @@ include SlingMessage
 #@sling.log.level = Logger::DEBUG
 
 namespace :data do
+  def get_count_offset
+    count = (ENV['OAEBLDR_COUNT'] || @num_users_groups).to_i
+    offset = (ENV['OAEBLDR_OFFSET'] || 0).to_i
+    return count, offset
+  end
+
   desc "Create initial content (users, connections, messages)"
   task :setup => ['data:users:create', 'data:connections:make', 'data:messages:send', 'data:groups:create']
 
@@ -32,19 +38,21 @@ namespace :data do
 
     desc "Make connections between each user and the next sequential user id"
     task :make do
-      @num_users_groups.times do |i|
-        i = i+1
-        n = i % @num_users_groups + 1
+      count, offset = get_count_offset
+      count.times do |i|
+        i += offset + 1
+        n = i % count + 1
         connect(i, n) 
       end
     end
 
     desc "Create tons of connections for each user"
     task :maketons do
-      @num_users_groups.times do |i|
-        i = i+1
-        (@num_users_groups-1).times do |j|
-          j=j+1
+      count, offset = get_count_offset
+      count.times do |i|
+        i += offset + 1
+        (count-1).times do |j|
+          j += offset + 1
           unless i == j
             connect(i, j)
           end
@@ -63,18 +71,20 @@ namespace :data do
         @logger.info "Usage: rake data:groups:addallusers group=groupid-role"
       else
         group = Group.new(ENV["group"])
-        @num_users_groups.times do |i|
-          i = i+1
+        count, offset = get_count_offset
+        count.times do |i|
+          i += offset + 1
           @logger.info "joining user#{i} to #{group.name}"
           @logger.info group.add_member(@sling, "user#{i}", "user") 
         end
       end
     end
     
-    desc "Create #{@num_users_groups} groups; Each is created by the user with the matching id"
+    desc "Create groups (default count = #{@num_users_groups}; Each is created by the user with the matching id"
     task :create do
-      @num_users_groups.times do |i|
-        i = i+1
+      count, offset = get_count_offset
+      count.times do |i|
+        i += offset + 1
         @logger.info "Creating Group #{i}"
         user = User.new("user#{i}", "test")
         @logger.info @um.create_full_group(user, "group#{i}", "Group #{i}", "Group #{i} description")
@@ -108,9 +118,10 @@ namespace :data do
 
     desc "Send messages between users"
     task :send do
-      @num_users_groups.times do |i|
-        i += 1
-        nextuser = i % @num_users_groups + 1
+      count, offset = get_count_offset
+      count.times do |i|
+        i += offset + 1
+        nextuser = i % count + 1
  
         sendmessage("user#{i}", "user#{nextuser}", "test #{i} => #{nextuser}", "test body #{i} => #{nextuser}") 
           
@@ -136,10 +147,11 @@ namespace :data do
   end
 
   namespace :users do
-    desc "Create #{@num_users_groups} users"
+    desc "Create users. Defaults to #{@num_users_groups}"
     task :create do
-      @num_users_groups.times do |i|
-        i = i+1
+      count, offset = get_count_offset
+      count.times do |i|
+        i += offset + 1
         @logger.info "Creating User #{i}"
         user = User.new("user#{i}")
         user.firstName = "User"
