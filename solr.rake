@@ -42,7 +42,7 @@ namespace :solr do
           FileUtils.mkdir_p(zip_name)
         else
           dirname = File.dirname(zip_name)
-          FileUtils.mkdir_p(dirname) unless File.exist?(dirname)
+          FileUtils.mkdir_p(dirname) unless File.directory?(dirname)
 
           open(zip_name, 'wb') do |f|
             f << zf.read
@@ -52,11 +52,19 @@ namespace :solr do
     end
   end
 
+  #
+  # Construct the command to call Jetty
+  #
+  def jetty_cmd(op)
+    script = RUBY_PLATFORM.downcase.include?("mswin") ? "jetty-cygwin.sh" : "jetty.sh"
+    cmd = "env JETTY_PORT=#{JETTY_PORT} JETTY_RUN=. #{JETTY_BASENAME}/bin/#{script} #{op}"
+  end
+
   ## ========== Tasks ==========================================================
   desc "Start the Solr server"
   task :start do
-    if File.exists? JETTY_BASENAME
-      CMD = "env JETTY_PORT=#{JETTY_PORT} #{JETTY_BASENAME}/bin/jetty.sh start"
+    if File.directory? JETTY_BASENAME
+      CMD = jetty_cmd('start')
       @logger.info "Starting Solr server with #{CMD}"
 
       process = ChildProcess.build(*CMD.split(" "))
@@ -70,8 +78,8 @@ namespace :solr do
 
   desc "Stop the Solr server"
   task :stop do
-    if File.exists? JETTY_BASENAME
-      CMD = "env JETTY_PORT=#{JETTY_PORT} #{JETTY_BASENAME}/bin/jetty.sh stop"
+    if File.directory? JETTY_BASENAME
+      CMD = jetty_cmd('stop')
       @logger.info "Stopping Solr server with #{CMD}"
 
       process = ChildProcess.build(*CMD.split(" "))
@@ -85,19 +93,19 @@ namespace :solr do
   
   desc "Download and configure Solr to run as a standalone server using Jetty."
   task :download => 'solr:download:jetty' do
-    unless File.exists? SOLR_FILENAME
+    unless File.file? SOLR_FILENAME
       @logger.info "Downloading Solr v#{SOLR_VERSION}"
-      download_file SOLR_DOWNLOAD_HOST,
-        SOLR_DOWNLOAD_URL, SOLR_FILENAME
+      download_file SOLR_DOWNLOAD_HOST, SOLR_DOWNLOAD_URL, SOLR_FILENAME
     else
       @logger.info "Found the Solr artifact already downloaded [#{SOLR_FILENAME}]."
     end
 
     # unzip the solr war into jetty
     ENV['solr_webapp'] = solr_webapp = "jetty-distribution-#{JETTY_VERSION}/webapps/solr"
-    unless File.exists? solr_webapp
+    unless File.directory? solr_webapp
       @logger.info "Unzipping solr webapp"
       unzip_file SOLR_FILENAME, solr_webapp
+      File.delete SOLR_FILENAME
     else
       @logger.info "Found the Solr webapp already deployed to Jetty [#{solr_webapp}]."
     end
@@ -105,14 +113,14 @@ namespace :solr do
 
   desc "Setup a local Solr webapp with Nakamura configuration and dependencies."
   task :setup => ['solr:download'] do
-    unless File.exists? "#{JETTY_BASENAME}"
+    unless File.directory? "#{JETTY_BASENAME}"
       @logger.info "Unable to find Jetty distribution [#{JETTY_BASENAME}]. rake solr:download:jetty can fix that."
       return
     end
 
     # create shell file to start solr with -Dsolr.solr.home="#{JETTY_BASENAME}/webapps/solr/conf"
     solr_dir = "#{JETTY_BASENAME}/solr"
-    FileUtils.mkdir solr_dir unless File.exists? solr_dir
+    FileUtils.mkdir solr_dir unless File.directory? solr_dir
 
     # copy the config files and dependencies to the solr webapp
     @logger.info "Copying configuration files to #{solr_dir}."
@@ -141,6 +149,16 @@ namespace :solr do
     @logger.info "====================================================="
   end
 
+  desc "Clean up Jetty and Solr artifacts."
+  task :clean => 'solr:stop' do
+    # delete jetty artifacts
+    rm_rf JETTY_FILENAME
+    rm_rf JETTY_BASENAME
+
+    # delete solr artifacts
+    rm_rf SOLR_FILENAME
+  end
+
   #
   # download namespace - tasks for downloading artifacts ancillary to Solr.
   #
@@ -148,22 +166,26 @@ namespace :solr do
     desc "Download jetty-distribution-#{JETTY_VERSION}.tar.gz."
     task :jetty do
       # download the jetty archive
-      unless File.exists? JETTY_FILENAME or File.exists? JETTY_BASENAME
+      unless File.file? JETTY_FILENAME or File.directory? JETTY_BASENAME
         @logger.info "Downloading Jetty v#{JETTY_VERSION}"
-        download_file JETTY_DOWNLOAD_HOST,
-          JETTY_DOWNLOAD_URL,
-          JETTY_FILENAME
+        download_file JETTY_DOWNLOAD_HOST, JETTY_DOWNLOAD_URL, JETTY_FILENAME
       else
         @logger.info "Found the Jetty artifact [#{JETTY_FILENAME}] or the unzipped results of the artifact [#{JETTY_BASENAME}]."
       end
 
       # unzip the jetty archive
-      if File.exists? JETTY_FILENAME and not File.exists? JETTY_BASENAME
+      if File.file? JETTY_FILENAME and not File.directory? JETTY_BASENAME
         @logger.info "Unzipping Jetty distribution"
         unzip_file JETTY_FILENAME, '.'
       else
         @logger.info "Found the Jetty artifact already unarchived in this folder [#{JETTY_BASENAME}]."
       end
+
+      # delete the downloaded archive
+      rm_rf JETTY_FILENAME
+
+      # make the jetty scripts executable
+      File.chmod 0755, "#{JETTY_BASENAME}/bin/jetty.sh", "#{JETTY_BASENAME}/bin/jetty-cygwin.sh"
     end
   end
 end

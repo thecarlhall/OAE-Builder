@@ -169,4 +169,4 @@ desc 'Shortcut to bld:update'
 task :update => 'bld:update'
 
 desc 'Shortcut to bld:clean'
-task :clean => 'bld:clean'
+task :clean => ['bld:clean', 'solr:clean']
